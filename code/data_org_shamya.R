@@ -25,7 +25,7 @@ df <- df %>%
   mutate(locationStart = str_locate(content, "\\("), locationEnd = str_locate(content, "\\)")) %>%
   mutate(locationStart = locationStart[,"start"], locationEnd = locationEnd[,"start"]) %>%
   mutate(location =  case_when(event == "Stopping" ~ str_sub(content, locationStart+1, locationEnd-1), 
-                               event != "Stopping" ~ "None")  ) %>%
+                               event != "Stopping" ~ NA)  ) %>%
   select(-c(locationStart, locationEnd)) %>%
   arrange(start) %>%
   group_by(location) %>% 
@@ -56,7 +56,7 @@ df <- df %>%
 df <- full_join(df, not_stopping) %>%
   select(-group_id) 
   
-df["location"][is.na(df["location"])] <- "None"
+# df["location"][is.na(df["location"])] <- "None"
 
 df <- df %>%
   ungroup() %>%
@@ -202,8 +202,8 @@ misuse_struggle <- full_join(misuse, struggle)
 states <- full_join(gaming_idle, misuse_struggle) 
 df <- full_join(non_states, states) 
 
-df["subject"][is.na(df["subject"])] <- "None"
-df["content"][is.na(df["content"])] <- "None"
+#df["subject"][is.na(df["subject"])] <- "None"
+#df["content"][is.na(df["content"])] <- "None"
 
 df_locations <- read_csv("./datasets/teacher_position_sprint1_shou (1).csv") 
 df_locations <- df_locations[!duplicated(df_locations[ , "time_stamp"]), ] # Remove rows with duplicated timestamps

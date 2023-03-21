@@ -1,7 +1,7 @@
 # Necessary imports
 library(tidyverse) 
 
-df <- read_csv("./event_master_file_D10_R500_RNG1000_sprint2_shou.csv") # Read in dataset
+df <- read_csv("./datasets/event_master_file_D10_R500_RNG1000_sprint2_shou.csv") # Read in dataset
 
 df <- df %>%
   # Make all stopping subjects NA so code doesn't break when attempting to collapse "Stopping lines"
@@ -205,25 +205,75 @@ df <- full_join(non_states, states)
 df["subject"][is.na(df["subject"])] <- "None"
 df["content"][is.na(df["content"])] <- "None"
 
-
-not_fixed_stopping <- df %>%
+df_locations <- read_csv("./datasets/teacher_position_sprint1_shou (1).csv") 
+df_locations <- df_locations[!duplicated(df_locations[ , "time_stamp"]), ] # Remove rows with duplicated timestamps
+ # Verify that joining variables are all numeric 
+df_locations <- df_locations %>%
+  mutate(time_stamp = as.numeric(time_stamp), dayID = as.numeric(dayID), periodID = as.numeric(periodID)) %>%
+  relocate(periodID, .before = "time_stamp") %>%
+  relocate(dayID, .before = "periodID") %>%
+  arrange(time_stamp) %>%
+  mutate(time_stamp = round(time_stamp, digits = 0))
+df <- df %>%
+  mutate(start = as.numeric(start), end = as.numeric(end), dayID = as.numeric(dayID), periodID = as.numeric(periodID)) %>%
   arrange(start) %>%
-  filter(event != "Monitoring class: Fixed" & event != "Stopping")
+  mutate(start = round(start, digits = 0)) %>%
+  mutate(end = round(end, digits = 0))
 
-fixed_stopping <- df %>%
+df <- df %>% 
+  left_join(df_locations, by = c("dayID", "periodID", "start" = "time_stamp")) %>%
   arrange(start) %>%
-  filter(event == "Monitoring class: Fixed" | event == "Stopping") %>%
-  mutate()
+  select(-c(tag19_X, tag20_X, tag19_Y, tag20_Y, tag19_score, tag20_score))  # Deselect irrelevant column
 
+# Pull relevant locations out of chosen_X and chosen Y, concatenate and save them
+df <- df %>%
+  mutate(imp_loc = str_c(as.character(chosen_X), ", ", as.character(chosen_Y))) %>%
+  mutate(silly = if_else(actor == "teacher" & event != "Stopping", TRUE, FALSE))  %>%
+  mutate(location_temp = location) %>%
+  mutate(location = case_when((silly == TRUE) ~ imp_loc, (silly == FALSE) ~ location_temp)) %>%
+  #Deselect irrelevant columns 
+  select(-c(chosen_X, chosen_Y, imp_loc, silly, location_temp))
 
-fixed <- which(fixed_stopping["event"] == "Monitoring class: Fixed")
+# Note: There are some teacher positions not included in the location dataset
+write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/code/collapsed_AI_classroom_data.csv", row.names = TRUE)
 
-for (i in fixed) {
-  fixed_stopping[i, ]$location <- fixed_stopping[i-1, ]$location
-}
+# Unused experimental code for bug fixes and whatnot 
+# 
+# Save end timestamps in another dataset, to join later
+# end_of_times <- df["end"]
+# 
+# df <- df %>%
+#   select(-end)
 
-df <- full_join(not_fixed_stopping, fixed_stopping) %>%
-  arrange(start)
+# na_df <- df %>%
+#   filter(is.na(chosen_X) | is.na(chosen_Y)) %>%
+#   select(-c(chosen_X, chosen_Y))
+# 
+# not_na_df <- df %>%
+#   filter(!is.na(chosen_X) & !is.na(chosen_Y))
 
+# relocate(periodID, .before = "time_stamp") %>%
+# relocate(dayID, .before = "periodID")# %>%
+#mutate(time_stamp2 = time_stamp, .after = "time_stamp")
 
-write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/collapsed_AI_classroom_data.csv", row.names = TRUE)
+#df_na_locs <- left_join(na_df, df_locations, by = c("dayID", "periodID", "time_stamp" = "start", "time_stamp2" = "end"))
+
+# Code to impute Monitoring class: Fixed location data with last Stopping row's location
+# not_fixed_stopping <- df %>%
+#   arrange(start) %>%
+#   filter(event != "Monitoring class: Fixed" & event != "Stopping")
+# 
+# fixed_stopping <- df %>%
+#   arrange(start) %>%
+#   filter(event == "Monitoring class: Fixed" | event == "Stopping") %>%
+#   mutate()
+# 
+# 
+# fixed <- which(fixed_stopping["event"] == "Monitoring class: Fixed")
+# 
+# for (i in fixed) {
+#   fixed_stopping[i, ]$location <- fixed_stopping[i-1, ]$location
+# }
+# 
+# df <- full_join(not_fixed_stopping, fixed_stopping) %>%
+#   arrange(start)

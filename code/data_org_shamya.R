@@ -1,8 +1,9 @@
+# install.packages("tibbletime")
 # Necessary imports
 library(tidyverse) 
-
+library(tibbletime)
 # Set working directory (local machine)
-setwd("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab")
+# setwd("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab")
 
 # Read in dataset
 df <- read_csv("./datasets/event_master_file_D10_R500_RNG1000_sprint2_shou.csv") 
@@ -261,7 +262,7 @@ df <- df %>%
   arrange(dayID, periodID, start)
 
 # Output csv to local file system, arranged by dayID, periodID, and timestamp.
-write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/code/collapsed_AI_classroom_data.csv", row.names = TRUE)
+write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/dataset/collapsed_AI_classroom_data.csv", row.names = FALSE)
 
 # Unused experimental code for bug fixes and notes
 # 

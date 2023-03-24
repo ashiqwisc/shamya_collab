@@ -262,7 +262,7 @@ df <- df %>%
   arrange(dayID, periodID, start)
 
 # Output csv to local file system, arranged by dayID, periodID, and timestamp.
-write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/dataset/collapsed_AI_classroom_data.csv", row.names = FALSE)
+write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
 
 # Unused experimental code for bug fixes and notes
 # 

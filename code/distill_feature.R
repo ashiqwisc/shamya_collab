@@ -1,5 +1,5 @@
 library(readr)
-df <- read_csv("code/collapsed_AI_classroom_data.csv")
+df <- read_csv("./datasets/collapsed_AI_classroom_data.csv")
 colnames(df)
 unique(df$event)
 df$distilled_event <- ""

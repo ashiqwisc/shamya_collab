@@ -3,7 +3,7 @@
 library(tidyverse) 
 library(tibbletime)
 # Set working directory (local machine)
-# setwd("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab")
+setwd("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab")
 
 # Read in dataset
 df <- read_csv("./datasets/event_master_file_D10_R500_RNG1000_sprint2_shou.csv") 
@@ -261,8 +261,108 @@ df <- df %>%
   ungroup() %>%
   arrange(dayID, periodID, start)
 
-# Output csv to local file system, arranged by dayID, periodID, and timestamp.
-write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
+# Impute teacher location based on the mean of the adjacent time points (the location of the teacher right before, the location 
+# of the teacher right after). Instances when location is NA twice in a row occur at the same timestamp;thus, we can have the same 
+# imputation for both instances 
+
+# Define a function to impute teacher locations
+teacher_imputer <- function(df) {
+  
+  # Make a copy of the dataframe 
+  df_copy <- data.frame(df)
+  # Get all indices in which the teacher locations are NA 
+  idx_list <- which(is.na(df_copy[,"location"]))
+  
+  # Save the indices that have NA locations before and after; these are special cases. Thus, look for consecutive values
+  # and save them.
+  # Iterate over the list, skipping the last element and the first element (these are confirmed non-consecutive)
+  special_idx <- c()
+  for (i in 2:(length(idx_list)-1)) {
+    if ((idx_list[i-1] == idx_list[i] - 1) | (idx_list[i+1] == idx_list[i] + 1)) {
+      special_idx <- append(special_idx, idx_list[i])
+    }
+  }
+  
+  # Remove the special indices from the idx_list 
+  idx_list <- idx_list[-which(idx_list %in% special_idx)]
+  
+  # First, impute the rows from idx_list 
+  for (j in idx_list) {
+    df_copy$V1[j] <- (df_copy$V1[j-1] + df_copy$V1[j+1])/2
+    df_copy$V2[j] <- (df_copy$V1[j-1] + df_copy$V2[j+1])/2
+    df_copy$location[j] <- str_c(as.character(df_copy$V1[j]), ", ", as.character(df_copy$V2[j]))
+  }
+  
+  # Then, impute the rows from special_idx
+    # Split special_idx into consecutive sequences. Data wasn't too big, hardcoded this for time's sake
+    sequence_1 <- list(269, 270)
+    sequence_2 <- list(829, 830, 831, 832, 833, 834)
+    sequence_3 <- list(988, 989)
+    sequence_4 <- list(1465, 1466, 1468, 1469, 1470, 1471, 1472, 1473, 1474, 1475)
+    sequence_5 <- list(1711, 1712)
+    sequence_6 <- list(1805, 1806)
+    sequence_7 <- list(2144, 2145)
+    sequence_8 <- list(2154, 2155)
+    sequence_9 <- list(2240, 2241)
+    sequence_10 <- list(2275, 2276)
+    sequence_11 <- list(2765, 2766, 2767)
+    list_sequences <- list(sequence_1, sequence_2, sequence_3, 
+                          sequence_4, sequence_5, sequence_6,
+                          sequence_7, sequence_8, sequence_9, sequence_10, sequence_11)
+    # For all sequences
+    for (x in list_sequences) {
+      # Get first idx in the sequence
+      first_idx <- x[[1]]
+      # Get last idx in the sequence
+      last_idx <- x[[length(x)]]
+      # Find previous row in teacher dataframe that isn't NA
+      previous_x <- df_copy$V1[first_idx - 1]
+      previous_y <- df_copy$V2[first_idx - 1]
+      # Find next row that isn't NA 
+      next_x <-  df_copy$V1[last_idx + 1]
+      next_y <- df_copy$V2[last_idx + 1]
+      # Take the average of those two locations, x and y
+      x_result <- (previous_x + next_x) / 2
+      y_result <- (previous_y + next_y) / 2
+      location_result <- str_c(as.character(x_result), ", ", as.character(y_result))
+      # Impute those locations for everything in that sequence, x and y 
+      for (i in x) {
+        df_copy$location[i] <- location_result
+      }
+    }
+      
+  # Return new dataframe
+  return(df_copy)
+}
+
+# To join later 
+df_not_teacher <- df %>%
+  filter(actor != "teacher")
+
+# Split teacher df away from old df
+df_teacher <- df %>%
+  filter(actor == "teacher") 
+
+# Before calculating the means and using the teacher_imputer, split location into its x and y coords 
+df_teacher[, 11:12] <- str_split_fixed(df_teacher$location, ", ", n = 2)
+
+# Make sure V1 and V2 split are numeric
+df_teacher <- df_teacher %>%
+  mutate(V1 = as.numeric(V1), V2 = as.numeric(V2)) 
+
+# Impute values and deselect irrelevant columns
+df_teacher <- teacher_imputer(df_teacher) %>%
+  select(-c(V1, V2))
+
+# Merge teacher and non_teacher data
+df <- full_join(df_not_teacher, df_teacher) %>%
+  arrange(dayID, periodID, start)
+
+# Output csv, arranged by dayID, periodID, and timestamp.
+write.csv(df, "./datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
+
+# Run other R script, that depends on above written CSV
+source("./code/distill_feature.R")
 
 # Unused experimental code for bug fixes and notes
 # 

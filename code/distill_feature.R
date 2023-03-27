@@ -27,3 +27,6 @@ df$distilled_event[df$event == "Struggle State"] <- "Struggle_State"
 unique(df$distilled_event)  
 View(df)
 # 12 codes useful
+# Write result to csv
+write.csv(df, "./datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
+

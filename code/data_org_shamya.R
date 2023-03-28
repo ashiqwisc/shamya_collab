@@ -8,12 +8,9 @@ setwd("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab")
 # Read in dataset
 df <- read_csv("./datasets/event_master_file_D10_R500_RNG1000_sprint2_shou.csv") 
 
-# Preliminary data tidying and organization before collapsing stopping rows
+# Preliminary data tidying and organization before collapsing stopping rows. We must account for "stopping at students" 
+# behavior, so we have to 
 df <- df %>%
-  # Make all stopping subjects NA so code doesn't break when attempting to collapse "Stopping lines"
-  mutate(subject_stopping = case_when((event == "Stopping") ~ TRUE, (event != "Stopping") ~ FALSE )) %>%
-  mutate(subject = case_when((subject_stopping == TRUE) ~ NA, (subject_stopping == FALSE) ~ subject)) %>%
-  select(-subject_stopping) %>%
   mutate(start = timestamp, end = 0) %>% # Make start and ending columns
   select(-timestamp) %>%
   relocate(start, .after = "periodID") %>%
@@ -34,7 +31,8 @@ df <- df %>%
                                event != "Stopping" ~ NA)  ) %>%
   select(-c(locationStart, locationEnd)) %>%
   arrange(start) %>%
-  group_by(location) %>% 
+  mutate(students = case_when((str_detect(subject, "Stu_") & event == "Stopping") ~ subject)) %>% 
+  group_by(location, students) %>% 
   mutate(group_id = cur_group_id()) %>%
   nest() 
 
@@ -64,11 +62,11 @@ df <- df %>%
   unnest(cols = c(new)) %>%
   relocate(location, .after = modality) %>%
   full_join(not_stopping) %>%  # Join the new stopping dataset with the non-stopping dataset
-  select(-group_id) %>%
   ungroup() %>%
+  select(-c(group_id, students)) %>%
   mutate(is_moving = case_when(event == "Moving" ~ TRUE, event != "Moving" ~ FALSE)) %>%
   mutate(group_id = 0) %>%
-  arrange(start) 
+  arrange(start, subject) 
 
 # It is particularly difficult to group the moving data now. We could group all moving data, but we want to group by each
 # continuous, uninterrupted sequence of moving rows. And, unlike the stopping rows, we don't have locations to base our grouping
@@ -387,10 +385,45 @@ students_df <- left_join(students_df, check_df, by = c("students" = "anon_user_i
   distinct() %>%
   arrange(students, `DayID`, `PeriodID`) %>%
   mutate(location_dataset = case_when((!is.na(X) & !is.na(Y)) ~ TRUE, (is.na(X) | is.na(Y)) ~ FALSE)) %>%
-  mutate(metadata_dataset = case_when((!is.na(ck_pre) | !is.na(ck_lg) | !is.na(pk_pre) | !is.na(pk_lg)) ~ TRUE, 
-                                      (is.na(ck_pre) & is.na(ck_lg) & is.na(pk_pre) & is.na(pk_lg)) ~ FALSE)) %>%
-  select(students, location_dataset, metadata_dataset) %>%
+  mutate(metadata_dataset_ck_pre = case_when(!is.na(ck_pre) ~ TRUE, is.na(ck_pre) ~ FALSE)) %>%
+  mutate(metadata_dataset_pk_pre = case_when(!is.na(pk_pre) ~ TRUE, is.na(pk_pre) ~ FALSE)) %>%
+  mutate(metadata_dataset_ck_lg = case_when(!is.na(ck_lg) ~ TRUE, is.na(ck_lg) ~ FALSE)) %>%
+  mutate(metadata_dataset_pk_lg = case_when(!is.na(pk_lg) ~ TRUE, is.na(pk_lg) ~ FALSE)) %>%
+  select(students, location_dataset, metadata_dataset_ck_pre, metadata_dataset_ck_lg, metadata_dataset_pk_pre, 
+         metadata_dataset_pk_lg) %>%
   distinct()
+
+# Make a dataframe that counts the number of T/F occurrences in all columns; used for data discovery
+location_counts <- students_df %>%
+  group_by(location_dataset) %>%
+  summarize(total_location= n())
+
+ck_pre_counts <- students_df %>%
+  group_by(metadata_dataset_ck_pre) %>%
+  summarize(total_ck_pre = n())
+
+ck_lg_counts <- students_df %>%
+  group_by(metadata_dataset_ck_lg) %>%
+  summarize(total_ck_lg = n())
+
+pk_pre_counts <- students_df %>%
+  group_by(metadata_dataset_pk_pre) %>%
+  summarize(total_pk_pre = n())
+
+pk_lg_counts <- students_df %>%
+  group_by(metadata_dataset_pk_lg) %>%
+  summarize(total_pk_lg = n())
+
+counts_students_df_temp1 <- cbind(ck_pre_counts, ck_lg_counts)
+counts_students_df_temp2 <- cbind(pk_pre_counts, pk_lg_counts)
+counts_students_df_temp3 <- cbind(location_counts, counts_students_df_temp1)
+counts_students_df <- cbind(counts_students_df_temp3, counts_students_df_temp2) %>%
+  select(c(location_dataset, total_location, total_ck_pre, total_ck_lg, total_pk_pre, total_pk_lg)) %>%
+  pivot_longer(location_dataset, names_to = "data", values_to = "missing") %>%
+  select(-data) %>%
+  relocate(missing, .before = total_location) %>%
+  rename(location = `total_location`, ck_pre = `total_ck_pre`, pk_pre = `total_pk_pre`, 
+         ck_lg = `total_ck_lg`, pk_lg = `total_pk_lg`)
 
 # Output csv, arranged by dayID, periodID, and timestamp.
 write.csv(df, "./datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
@@ -404,6 +437,9 @@ write.csv(students_df, "./datasets/students.csv")
 
 # Unused experimental code for bug fixes and notes
 # 
+# Output csv for missing data T/F dataframe
+# write.csv(counts_students_df, "./datasets/")
+#
 # Save end timestamps in another dataset, to join later
 # end_of_times <- df["end"]
 # 
@@ -447,5 +483,8 @@ write.csv(students_df, "./datasets/students.csv")
 
 #df["subject"][is.na(df["subject"])] <- "None"
 #df["content"][is.na(df["content"])] <- "None"
-
+# Make all stopping subjects NA so code doesn't break when attempting to collapse "Stopping lines"
+# mutate(subject_stopping = case_when((event == "Stopping") ~ TRUE, (event != "Stopping") ~ FALSE )) %>%
+# mutate(subject = case_when((subject_stopping == TRUE) ~ NA, (subject_stopping == FALSE) ~ subject)) %>%
+# select(-subject_stopping) %>%
 # Note: There are some teacher positions not included in the location dataset.

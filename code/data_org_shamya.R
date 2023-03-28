@@ -262,7 +262,7 @@ df <- df %>%
   arrange(dayID, periodID, start)
 
 # Impute teacher location based on the mean of the adjacent time points (the location of the teacher right before, the location 
-# of the teacher right after). Instances when location is NA twice in a row occur at the same timestamp;thus, we can have the same 
+# of the teacher right after). Instances when location is NA twice in a row occur at the same timestamp; thus, we can have the same 
 # imputation for both instances 
 
 # Define a function to impute teacher locations
@@ -358,11 +358,49 @@ df_teacher <- teacher_imputer(df_teacher) %>%
 df <- full_join(df_not_teacher, df_teacher) %>%
   arrange(dayID, periodID, start)
 
+# Read in CSVs containing student locations and student metdata; use only the learning markers for the student metadata
+student_locations <- read_csv("./datasets/student_position_sprint1_shou.csv") %>%
+  select(-SeatNum) 
+student_learning <- read_csv("./datasets/meta-data-aied.csv") %>%
+  select(anon_student_id, ck_pre, ck_lg, pk_pre, pk_lg)
+
+# Join the student locations and student metadata to see which student IDs have missing data in either dataset
+check_df <- full_join(student_locations, student_learning, by = c("actual_user_id" = "anon_student_id"))
+
+# Make a dataframe with all the distinct students in the original dataframe 
+students_df <- df %>%
+  select(c(actor, subject)) %>%
+  filter(actor != "teacher" & actor != "tutor") %>%
+  select(-subject) %>%
+  distinct() %>%
+  mutate(bool = str_detect(actor, "Stu")) %>%
+  filter(bool) %>%
+  select(-bool) %>%
+  rename(students = actor)
+
+# Strip check_df of unnecessary columns
+check_df <- check_df %>%
+  select(-c(actual_user_id))
+
+# Join check_df with students_df
+students_df <- left_join(students_df, check_df, by = c("students" = "anon_user_id"), multiple ="all") %>%
+  distinct() %>%
+  arrange(students, `DayID`, `PeriodID`) %>%
+  mutate(location_dataset = case_when((!is.na(X) & !is.na(Y)) ~ TRUE, (is.na(X) | is.na(Y)) ~ FALSE)) %>%
+  mutate(metadata_dataset = case_when((!is.na(ck_pre) & !is.na(ck_lg) & !is.na(pk_pre) & !is.na(pk_lg)) ~ TRUE, 
+                                      (is.na(ck_pre) | is.na(ck_lg) | is.na(pk_pre) | is.na(pk_lg)) ~ FALSE)) %>%
+  select(students, location_dataset, metadata_dataset) %>%
+  distinct()
+
 # Output csv, arranged by dayID, periodID, and timestamp.
 write.csv(df, "./datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
 
 # Run other R script, that depends on above written CSV
 source("./code/distill_feature.R")
+
+# Output csv for students_df, a dataframe that checks whether or not individual students in df are in the student location df
+# and/or the student metadata df
+write.csv(students_df, "./datasets/students.csv")
 
 # Unused experimental code for bug fixes and notes
 # 

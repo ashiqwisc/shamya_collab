@@ -387,8 +387,8 @@ students_df <- left_join(students_df, check_df, by = c("students" = "anon_user_i
   distinct() %>%
   arrange(students, `DayID`, `PeriodID`) %>%
   mutate(location_dataset = case_when((!is.na(X) & !is.na(Y)) ~ TRUE, (is.na(X) | is.na(Y)) ~ FALSE)) %>%
-  mutate(metadata_dataset = case_when((!is.na(ck_pre) & !is.na(ck_lg) & !is.na(pk_pre) & !is.na(pk_lg)) ~ TRUE, 
-                                      (is.na(ck_pre) | is.na(ck_lg) | is.na(pk_pre) | is.na(pk_lg)) ~ FALSE)) %>%
+  mutate(metadata_dataset = case_when((!is.na(ck_pre) | !is.na(ck_lg) | !is.na(pk_pre) | !is.na(pk_lg)) ~ TRUE, 
+                                      (is.na(ck_pre) & is.na(ck_lg) & is.na(pk_pre) & is.na(pk_lg)) ~ FALSE)) %>%
   select(students, location_dataset, metadata_dataset) %>%
   distinct()
 

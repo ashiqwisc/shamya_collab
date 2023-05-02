@@ -376,6 +376,10 @@ students_df <- df %>%
   select(-bool) %>%
   rename(students = actor)
 
+silly <- check_df %>%
+  select(actual_user_id, anon_user_id) %>%
+  drop_na()
+
 # Strip check_df of unnecessary columns
 check_df <- check_df %>%
   select(-c(actual_user_id))
@@ -423,7 +427,17 @@ counts_students_df <- cbind(counts_students_df_temp3, counts_students_df_temp2) 
   select(-data) %>%
   relocate(missing, .before = total_location) %>%
   rename(location = `total_location`, ck_pre = `total_ck_pre`, pk_pre = `total_pk_pre`, 
-         ck_lg = `total_ck_lg`, pk_lg = `total_pk_lg`)
+         ck_lg = `total_ck_lg`, pk_lg = `total_pk_lg`, not_missing = `missing`)
+
+
+# Join anon "coloranimal" IDs through silly
+students_df <- left_join(students_df, silly, by = c("students" = "anon_user_id")) %>%
+  distinct() %>%
+  rename(animal_id = actual_user_id ) %>%
+  relocate(animal_id, .after = students)
+
+# Output csv for counts_student_df
+write.csv(counts_students_df, "./datasets/metadata_counts_students.csv", row.names = FALSE)
 
 # Output csv, arranged by dayID, periodID, and timestamp.
 write.csv(df, "./datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)

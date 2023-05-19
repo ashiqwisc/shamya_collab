@@ -1,0 +1,97 @@
+---
+title: "Seat mapping"
+author: "Tianze (Steven) Shou"
+date: "6/9/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## What's this for? 
+
+A curated file named `curated_seating_char_shou.csv` needs to be populated with the following columns: 
+
++ PeriodID (1-5)
++ DayID (1-3)
++ SeatNum (1-29)
++ anon_user_id (i.e., <Stud_xxx>)
++ actual_user_id (i.e., <greenalpaca>)
++ X
++ Y
+
+`PeriodID`, `DayID`, `SeatNum`, and `actual_user_id` had to be manually entered since the data are presented by seating charts drawn by Shamya. This Rmd file takes care of the remaining columns and enter them automatically since I am very lazy. The mapping information is drawn from `IDmapping_WVW.csv` and `seating_chart_x_y_shou.csv` 
+
+## Reading in necessary data 
+
+```{r}
+IDmapping_df = read_csv("IDmapping_WVW_copy.csv") 
+seat_coor_df = read_csv("seating_chart_x_y_shou.csv")
+output_df = read_csv("curated_seating_chart_shou.csv")
+```
+
+## Mapping seat number to X and Y coordinates 
+
+Seat number to X, Y coordinates mapping is in `seating_chart_x_y_shou.csv` file. 
+
+```{r}
+output_length = length(output_df$SeatNum)
+X = rep(NA, output_length)
+Y = rep(NA, output_length)
+for(i in 1:output_length) { 
+  # matching seat number in the output df with the seat# of seat_coor_df
+  # i is for output_df indexing, index is for seat_coor_df
+  index = which(seat_coor_df$`seat#` == output_df$SeatNum[i]) 
+  X[i] = seat_coor_df$X[index]
+  Y[i] = seat_coor_df$Y[index] 
+}
+
+output_df$X = X 
+output_df$Y = Y
+
+```
+
+
+## Mapping actual user ID's to anonymous user ID's 
+
+Actual user ID to anonymous user ID mapping is in `IDmapping_WVW.csv` file 
+
+```{r}
+output_length = length(output_df$SeatNum)
+anon_user_id = rep(NA, output_length)
+for(i in 1:output_length) { 
+  # matching actual_user_id in the output df with the actual_user_id# of IDmapping_df
+  # i is for output_df indexing, index is for IDmapping_df
+  index = which(IDmapping_df$actual_user_id == output_df$actual_user_id[i])
+  
+  # if there is not matching actual_user_id in IDmapping dataframe 
+  if(length(IDmapping_df$anon_user_id[index]) == 0) {
+    # assign the corresponding anon id value to be NA 
+    # since its anon id is not found
+    corr_anon_id = NA
+  }
+  else {
+    corr_anon_id = IDmapping_df$anon_user_id[index]
+  }
+  
+  #cat("Actual ID is", output_df$actual_user_id[i], "\n")
+  #cat("Matched anon ID is", corr_anon_id, "\n\n") 
+  anon_user_id[i] = corr_anon_id 
+}
+
+# transcribe to the output dataframe 
+output_df$anon_user_id = anon_user_id 
+```
+
+## Storing output dataframe in a csv file 
+
+```{r}
+write_csv(output_df, "student_position_sprint1_shou.csv") 
+```
+
+
+
+
+

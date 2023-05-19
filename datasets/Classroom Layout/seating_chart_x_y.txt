@@ -1,0 +1,68 @@
+Class Boundary:
+(top left -> clockwise)
+	1 2
+	6 3
+	5 4
+
+x, y #just layout - actual coordinates below - has negatives
+0, 0 -> bottom/back left corner (anchor #5)
+0, 1 -> middle left (anchor #6)
+0, 2 -> top/front left corner (anchor #1)
+1, 0 -> bottom/back right corner (anchor #4)
+1, 1 -> middle right (anchor #3)
+1, 2 -> top/front right corner (anchor #2)
+
+
+Anchor #1: Anchor ID 5193: x -301 y 5670 
+Anchor #2: Anchor ID 5180: x 5337 y 4924
+Anchor #3: Anchor ID 5148: x 6113 y 1779
+Anchor #4: Anchor ID 5192: x 5599 y -2068
+Anchor #5: Anchor ID 5114: x -109 y -2201
+Anchor #6: Anchor ID 5041: x -269 y 1808
+
+
+Objects in the classroom: 
+Teacher's Desk: 1227, 4911
+Blackboard: -895, 2916
+Blackboard start:
+Blackboard end: 
+Door start: 244, -948 #bottom left corner
+Door end: 291, -408
+Window 1 start (back): 6816, -1817
+Window 1 end (front): 6718, 321
+Window 2 start (back): 6449, 2408
+Window 2 end (front): 6406, 4083
+Projector start (left): 1688, 5809
+Projector end (right): 3569, 5809
+
+
+Seats:
+Seat #1: 2478, 4280
+Seat #2: 3327, 4178
+Seat #3: 288, 3702
+Seat #4: 1424, 3554
+Seat #5: 519, 2934 
+Seat #6: 1050, 2988
+Seat #7: 2498, 2963
+Seat #8: 3017, 2959
+Seat #9: 4026, 4000
+Seat #10: 5221, 3824
+Seat #11: 4258, 3094
+Seat #12: 4949, 2917
+Seat #13: 626, 1861
+Seat #14: 1935, 1869
+Seat #15: 1053, 1221
+Seat #16: 1553, 1090
+Seat #17: 3681, 1799
+Seat #18: 5108, 1889
+Seat #19: 4016, 1110
+Seat #20: 4760, 1112
+Seat #21: 500, -6
+Seat #22: 2594, -201
+Seat #23: 968, -927
+Seat #24: 1592, -1044
+Seat #25: 2502, -877
+Seat #26: 3535, -69
+Seat #27: 5014, -223
+Seat #28: 3910, -1143 #where i was sitting
+Seat #29: 4528, -1006

@@ -1,0 +1,89 @@
+---
+title: "Multimodal ONA Model for Dr. Shamya"
+output:
+  html_document:
+    df_print: paged
+editor_options: 
+  chunk_output_type: inline
+---
+
+# 0. Read in and process dataset
+```{r}
+library(rENA)
+library(tma)
+library(ona)
+library(tidyverse)
+df <- read.csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv")
+```
+
+# 1. Define units, codes, metadata, and HOO rules
+```{r}
+unit_cols <- c("dayID", "periodID", "actor")
+code_cols <- c("distilled_event")
+meta_cols <- c("event", "subject", "content", "location")
+HOO_rules_model <- tma:::rules(
+  dayID %in% UNIT$dayID & periodID %in% UNIT$periodID
+)
+```
+
+# 2. Define contexts based on HOO rules
+```{r}
+context_model <- tma:::contexts(
+  x = df,
+  units = unit_cols,
+  hoo_rules = HOO_rules_model
+)
+```
+
+# 3. Accumulate contexts and build ONA model
+```{r}
+# TODO: Fix error
+# Define accumulation function
+ona_multimodal_tif_accum <- tma:::accumulate_contexts (
+    x = context_model,
+    codes = code_cols,
+    weight.by = function(x) { x },
+    decay.function = function(x) {
+      mod <- FULL_CONTEXT[RESPONSE_INDEX, ]$modality
+      if(mod == "position")
+        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 30))*1
+      if(mod == "observation")
+        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 10))*1
+      if(mod == "tutor")
+        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 20))*1
+      if(mod == "detector")
+        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 10))*1
+      else
+        return(0)
+      },
+    time.column = "start", 
+    return.ena.set = FALSE,
+    mode.column = "modality"
+) 
+
+ona_multimodal_tif_set <-
+  model(ona_multimodal_tif_accum)
+```
+
+# 4. Analyze model
+## 1. Goodness of fit
+```{r}
+ona_multimodal_tif_gof <- ona:::correlations(ona_multimodal_tif_set)$pearson
+ona_multimodal_tif_gof[[1]]
+```
+
+## 2. Variance explained
+```{r}
+# # TODO: Decide on something to regress against 
+# ona_multimodal_tif_SVD <- lm(ona_multimodal_tif_set$points$SVD1 ~ ona_multimodal_tif_set$points$) %>% summary()
+# ona_multimodal_tif_SVD$r.squared
+```
+
+## 3. Interpretive alignment
+```{r}
+make.ona.plot(ona_multimodal_tif_set, 
+              "Shamya Multimodal Model")
+```
+
+
+

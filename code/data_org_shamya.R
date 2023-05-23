@@ -6,7 +6,7 @@ library(tibbletime)
 setwd("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab")
 
 # Read in dataset
-df <- read_csv("./datasets/event_master_file_D10_R500_RNG1000_sprint2_shou.csv") 
+df <- read_csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/event_master_file_D10_R500_RNG1000_sprint2_shou.csv") 
 
 # Preliminary data tidying and organization before collapsing stopping rows. We must account for "stopping at students" 
 # behavior, so we have to 
@@ -230,7 +230,7 @@ states <- full_join(gaming_idle, misuse_struggle)
 df <- full_join(non_states, states) 
 
 # Read in the locations dataset 
-df_locations <- read_csv("./datasets/teacher_position_sprint1_shou (1).csv") 
+df_locations <- read_csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/teacher_position_sprint1_shou (1).csv") 
 # Remove rows with duplicated timestamps
 df_locations <- df_locations[!duplicated(df_locations[ , "time_stamp"]), ] 
 
@@ -357,9 +357,9 @@ df <- full_join(df_not_teacher, df_teacher) %>%
   arrange(dayID, periodID, start)
 
 # Read in CSVs containing student locations and student metdata; use only the learning markers for the student metadata
-student_locations <- read_csv("./datasets/student_position_sprint1_shou.csv") %>%
+student_locations <- read_csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/student_position_sprint1_shou.csv") %>%
   select(-SeatNum) 
-student_learning <- read_csv("./datasets/meta-data-aied.csv") %>%
+student_learning <- read_csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/meta-data-aied.csv") %>%
   select(anon_student_id, ck_pre, ck_lg, pk_pre, pk_lg)
 
 # Join the student locations and student metadata to see which student IDs have missing data in either dataset
@@ -437,17 +437,80 @@ students_df <- left_join(students_df, silly, by = c("students" = "anon_user_id")
   relocate(animal_id, .after = students)
 
 # Output csv for counts_student_df
-write.csv(counts_students_df, "./datasets/metadata_counts_students.csv", row.names = FALSE)
+write.csv(counts_students_df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/metadata_counts_students.csv", row.names = FALSE)
 
 # Output csv, arranged by dayID, periodID, and timestamp.
-write.csv(df, "./datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
+write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
 
 # Run other R script, that depends on above written CSV
-source("./code/distill_feature.R")
+source("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/code/distill_feature.R")
 
 # Output csv for students_df, a dataframe that checks whether or not individual students in df are in the student location df
 # and/or the student metadata df
-write.csv(students_df, "./datasets/students.csv")
+write.csv(students_df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/students.csv")
+
+
+# Read in CSV again; more data organization before model 0 
+df <- read.csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv")
+
+# Pivot wider distilled_event columns 
+df <- df %>%
+  mutate(yesno = 1) %>%
+  distinct() %>%
+  pivot_wider(names_from = "distilled_event", values_from = "yesno", values_fill = 0) %>%
+  arrange(dayID, periodID, start)
+
+# Get rid of "no student seated" rows
+df <- df %>%
+  mutate(no_stud_seated = ifelse((str_detect(actor, "no student seated") | str_detect(subject, "no student seated")) & (!is.na(actor) & !is.na(subject)), TRUE, FALSE)) %>%
+  filter(no_stud_seated != TRUE) %>%
+  select(-no_stud_seated)
+
+# Get rid of Stu_ad3644e04bb6c4380286ec229aa48df1, Stu_4ae0ba339faed21609e388896a3ca39a
+df <- df %>%
+  filter(!str_detect(actor,"Stu_ad3644e04bb6c4380286ec229aa48df1") | is.na(actor)) %>%
+  filter(!str_detect(subject,"Stu_ad3644e04bb6c4380286ec229aa48df1") | is.na(subject)) %>%
+  filter(!str_detect(actor,"Stu_4ae0ba339faed21609e388896a3ca39a") | is.na(actor)) %>%
+  filter(!str_detect(subject,"Stu_4ae0ba339faed21609e388896a3ca39a") | is.na(subject))
+
+# Join student locations for remaining students (students that have them) 
+
+  # In the student_locations dataframe, add a column X, Y for student locations. Rename DayID -> dayID and PeriodID -> periodID
+  student_locations <- student_locations %>%
+    mutate(student_loc = str_c(as.character(X), ", ", as.character(Y))) %>%
+    rename(dayID = DayID) %>%
+    rename(periodID = PeriodID)
+  
+  # If actor is a student, pull it out into a column "anon_user_id" 
+  df <- df %>%
+    mutate(anon_user_id = case_when(str_detect(actor, "Stu") ~ actor)) 
+  
+  # Then, join the dataframes by anon_user_id, dayID, and periodID
+  df <- left_join(df, student_locations, by = c("periodID" = "periodID", "dayID" = "dayID", "anon_user_id" = "anon_user_id"))
+  
+  # Impute cases, when the anon_user_id is not NA, location as the new joined column. Deselect unnecessary columns
+  df <- df %>%
+    mutate(location = case_when(!is.na(anon_user_id) ~ student_loc, is.na(anon_user_id) ~ location)) %>%
+    select(-c(anon_user_id, X, Y, student_loc, actual_user_id))
+  
+# Impute distances between student and teacher
+  
+# Impute facing the screen features 
+
+# Finally, write dataset 
+write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
+
+
+
+
+
+
+
+
+
+
+
+
 
 # Unused experimental code for bug fixes and notes
 # 

@@ -19,7 +19,9 @@ df <- read.csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datase
 # 1. Define units, codes, metadata, and HOO rules
 ```{r}
 unit_cols <- c("dayID", "periodID", "actor")
-code_cols <- c("distilled_event")
+code_cols <- c(
+  "Moving", "Stopping", "Talking", "Monitoring", "Incorrect_attempt", "Correct_attempt", "Raising_hand", "Hint_request", "Gaming_State", "Misuse_State", "Idle_State", "Inactive", "Questioning", "Struggle_State"
+)
 meta_cols <- c("event", "subject", "content", "location")
 HOO_rules_model <- tma:::rules(
   dayID %in% UNIT$dayID & periodID %in% UNIT$periodID
@@ -81,6 +83,7 @@ ona_multimodal_tif_gof[[1]]
 
 ## 3. Interpretive alignment
 ```{r}
+source("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/code/ona_plotter_shamya.R")
 make.ona.plot(ona_multimodal_tif_set, 
               "Shamya Multimodal Model")
 ```

@@ -76,16 +76,14 @@ ona_multimodal_tif_gof[[1]]
 
 ## 2. Variance explained
 ```{r}
-# # TODO: Decide on something to regress against 
-# ona_multimodal_tif_SVD <- lm(ona_multimodal_tif_set$points$SVD1 ~ ona_multimodal_tif_set$points$) %>% summary()
-# ona_multimodal_tif_SVD$r.squared
+ona_multimodal_tif_SVD <- lm(ona_multimodal_tif_set$points$SVD1 ~ ona_multimodal_tif_set$points$periodID) %>% summary()
+ona_multimodal_tif_SVD$r.squared
 ```
 
 ## 3. Interpretive alignment
 ```{r}
 source("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/code/ona_plotter_shamya.R")
-make.ona.plot(ona_multimodal_tif_set, 
-              "Shamya Multimodal Model")
+make.ona.plot(ona_multimodal_tif_set, "Shamya Multimodal Model")
 ```
 
 

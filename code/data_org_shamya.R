@@ -2,6 +2,8 @@
 # Necessary imports
 library(tidyverse) 
 library(tibbletime)
+library(janitor)
+library(lsa)
 # Set working directory (local machine)
 setwd("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab")
 
@@ -449,7 +451,6 @@ source("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/code/distill_f
 # and/or the student metadata df
 write.csv(students_df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/students.csv")
 
-
 # Read in CSV again; more data organization before model 0 
 df <- read.csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv")
 
@@ -493,22 +494,134 @@ df <- df %>%
     mutate(location = case_when(!is.na(anon_user_id) ~ student_loc, is.na(anon_user_id) ~ location)) %>%
     select(-c(anon_user_id, X, Y, student_loc, actual_user_id))
   
-# Impute distances between student and teacher
+# Impute distances between student and teacher and facing the screen features
   
-# Impute facing the screen features 
+# Code repatriated from AIED position analytics, authored by Conrad Borchers
+# https://github.com/conradborchers/position-analytics/blob/main/main.R
+  # Screen facing vectors, given that desk is top left
+SCREEN_FACE <- tribble(
+  ~seat_num, ~x_face, ~y_face,
+  1, 0, 1, # Up
+  2, 0, 1, 
+  3, 1, 0, # right
+  4, -1, 0, # left
+  5, 0, 1,
+  6, 0, 1,
+  7, 0, 1,
+  8, 0, 1, 
+  9, 1, 0,
+  10, -1, 0,
+  11, 0, 1, 
+  12, 0, 1,
+  13, 1, 0,
+  14, -1, 0,
+  15, 0, 1,
+  16, 0, 1,
+  17, 1, 0,
+  18, -1, 0,
+  19, 0, 1,
+  20, 0, 1,
+  21, 1, 0,
+  22, -1, 0,
+  23, 0, 1,
+  24, 0, 1,
+  25, 0, 1,
+  26, 1, 0,
+  27, -1, 0,
+  28, 0, 1, 
+  29, 0, 1
+)
+  
+d_teacher_pos <- read_csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/teacher_position_sprint1_shou (1).csv") %>% 
+  janitor::clean_names() %>% 
+  select(period_id, day_id, time_unix = time_stamp, x = chosen_x, y = chosen_y)
+
+d_student_pos <- read_csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/student_position_sprint1_shou.csv") %>% 
+  janitor::clean_names() %>% 
+  select(period_id, day_id, seat_num, anon_student_id = anon_user_id, x_obj = x, y_obj = y)
+
+d_seats <- d_student_pos %>% 
+  distinct(seat_num, x_obj, y_obj) %>% # there are no duplicates, so this can be joined unambiguously by crosswalks
+  arrange(seat_num)
+
+euclid <- function(x1, y1, x2, y2) {
+  ans <- sqrt((x1-x2)**2 + (y1-y2)**2)
+  return(ans)
+}
+
+for (i in d_seats$seat_num) {
+  xx = d_seats$x_obj[d_seats$seat_num==i]
+  yy = d_seats$y_obj[d_seats$seat_num==i]
+  d_teacher_pos[paste('seat', i, '_dist', sep='')] <- euclid(d_teacher_pos$x, d_teacher_pos$y, xx, yy)
+}
+
+d_teacher_pos['x_traj'] <- d_teacher_pos$x - lag(d_teacher_pos$x, 1)
+d_teacher_pos['y_traj'] <- d_teacher_pos$y - lag(d_teacher_pos$y, 1)
+
+# Findings robust when calculating and averaging rolling average with varied k
+
+# Add facing screen alignment
+for (i in SCREEN_FACE$seat_num) {
+  cat('Processing seat #', i, '\n')
+  xx = SCREEN_FACE$x_face[SCREEN_FACE$seat_num==i]
+  yy = SCREEN_FACE$y_face[SCREEN_FACE$seat_num==i]
+  varname = paste('seat', i, '_screenalign', sep='')
+  d_teacher_pos <- d_teacher_pos %>% 
+    rowwise() %>% 
+    mutate(tmp = as.numeric(lsa::cosine(c(x_traj, y_traj), c(xx, yy))))
+  names(d_teacher_pos)[names(d_teacher_pos) == 'tmp'] <- varname 
+}
+
+d_teacher_pos['velocity'] <- 
+  euclid(d_teacher_pos$x, d_teacher_pos$y, lag(d_teacher_pos$x, 1), lag(d_teacher_pos$y, 1))
+
+# Join new teacher vars to student data
+# Step 1: Wide to long
+d_teacher_pos_long <- d_teacher_pos %>% 
+  pivot_longer(!matches('period_id|day_id|time|x|y|velocity')) %>% 
+  separate(name, sep = '_', into = c('num', 'type')) %>% 
+  pivot_wider(names_from = type, values_from = value) %>% 
+  mutate(seat_num = str_remove(num, 'seat') %>% as.numeric()) %>% 
+  select(-num)
+
+# Step 2: Closest timestamp for each student to teacher data timestamp
+
+join_this <- d_teacher_pos_long %>% 
+  left_join(d_student_pos %>% select(period_id, day_id, seat_num, anon_student_id), by = c('period_id', 'day_id', 'seat_num')) %>% 
+  filter(!is.na(anon_student_id)) %>% 
+  filter(!is.na(velocity)) %>% 
+  select(anon_student_id, time_unix, dist, velocity, screenalign) %>% 
+  distinct(anon_student_id, time_unix, .keep_all = TRUE)
+
+# If actor or subject is a student, pull it out into a column "anon_student_id" 
+df <- df %>%
+  mutate(anon_student_id = case_when(str_detect(actor, "Stu") ~ actor, str_detect(subject, "Stu") ~ subject)) 
+
+# Join these new features to the dataframe
+df <- left_join(df, join_this, by = c("anon_student_id" = "anon_student_id", "start" = "time_unix"))
+
+# This is much more complex than I initially thought. Since the data is for intervals, there has to be extensive
+# data organization in order to accurately have facing the screen features, teacher velocity, and student-teacher distance 
+# for each timestamp of question
+
+# The likely step I'll take is to define a function that takes the student-teacher distance, the teacher velocity, and the
+# screen alignment at the start timestamp and the end timestamp, averages them, then imputes that as the distance, 
+# velocity, and screen alignment
+
+# Huge issue: Some teacher and student locations simply do not exist in the metadataset. For these cases, we'll solve for.
+# When defining the spatial-temporal function, we might just use Conrad's distance data and get rid of all the location stuff.
+
+# For now, just process the stuff that can be processed lol 
+df <- df %>%
+  select(-`anon_student_id`) %>%
+  rename(stu_teach_distance = dist) %>%
+  rename(teach_velocity = velocity) %>%
+  relocate(stu_teach_distance, .after = `location`) %>%
+  relocate(teach_velocity, .after = stu_teach_distance) %>%
+  relocate(screenalign, .after = teach_velocity)
 
 # Finally, write dataset 
 write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -564,4 +677,3 @@ write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/dataset
 # mutate(subject_stopping = case_when((event == "Stopping") ~ TRUE, (event != "Stopping") ~ FALSE )) %>%
 # mutate(subject = case_when((subject_stopping == TRUE) ~ NA, (subject_stopping == FALSE) ~ subject)) %>%
 # select(-subject_stopping) %>%
-# Note: There are some teacher positions not included in the location dataset.

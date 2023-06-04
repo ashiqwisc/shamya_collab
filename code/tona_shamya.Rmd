@@ -13,14 +13,16 @@ library(rENA)
 library(tma)
 library(ona)
 library(tidyverse)
-df <- read.csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv")
+df <- read.csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv") %>%
+  filter(periodID != 5)
+  
 ```
 
 # 1. Define units, codes, metadata, and HOO rules
 ```{r}
 unit_cols <- c("dayID", "periodID", "actor")
 code_cols <- c(
-  "Moving", "Stopping", "Talking", "Monitoring", "Incorrect_attempt", "Correct_attempt", "Raising_hand", "Hint_request", "Gaming_State", "Misuse_State", "Idle_State", "Inactive", "Questioning", "Struggle_State"
+  "Moving", "Stopping", "Talking", "Monitoring", "Raising_hand", "Gaming_State", "Misuse_State", "Idle_State", "Inactive", "Questioning", "Struggle_State"
 )
 meta_cols <- c("event", "subject", "content", "location")
 HOO_rules_model <- tma:::rules(
@@ -39,7 +41,6 @@ context_model <- tma:::contexts(
 
 # 3. Accumulate contexts and build ONA model
 ```{r}
-# TODO: Fix error
 # Define accumulation function
 ona_multimodal_tif_accum <- tma:::accumulate_contexts (
     x = context_model,
@@ -48,11 +49,11 @@ ona_multimodal_tif_accum <- tma:::accumulate_contexts (
     decay.function = function(x) {
       mod <- FULL_CONTEXT[RESPONSE_INDEX, ]$modality
       if(mod == "position")
-        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 30))*1
+        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 15))*1
       if(mod == "observation")
-        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 10))*1
-      if(mod == "tutor")
         return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 20))*1
+      if(mod == "tutor")
+        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 5))*1
       if(mod == "detector")
         return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 10))*1
       else

@@ -7,8 +7,8 @@ make.ona.plot <- function(set,
   grand_mean <- plot(set, title = "Grand Mean ONA plot") %>%
     edges(
       weights = set$line.weights,
-      edge_size_multiplier = 1.5,
-      edge_saturation_multiplier = 2,
+      edge_size_multiplier = 0.8,
+      edge_saturation_multiplier = 1,
       edge_color = c("black")) %>%
     nodes(
       # node_size_multiplier = 0.5,

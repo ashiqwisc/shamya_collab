@@ -22,7 +22,7 @@ df <- read.csv("~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datase
 ```{r}
 unit_cols <- c("dayID", "periodID", "actor")
 code_cols <- c(
-  "Moving", "Stopping", "Talking", "Monitoring", "Raising_hand", "Gaming_State", "Misuse_State", "Idle_State", "Inactive", "Questioning", "Struggle_State"
+  "Moving", "Stopping", "Talking", "Monitoring", "Raising_hand", "Misuse_State", "Idle_State", "Inactive", "Questioning", "Struggle_State"
 )
 meta_cols <- c("event", "subject", "content", "location")
 HOO_rules_model <- tma:::rules(
@@ -49,13 +49,13 @@ ona_multimodal_tif_accum <- tma:::accumulate_contexts (
     decay.function = function(x) {
       mod <- FULL_CONTEXT[RESPONSE_INDEX, ]$modality
       if(mod == "position")
-        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 15))*1
-      if(mod == "observation")
-        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 20))*1
-      if(mod == "tutor")
         return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 5))*1
+      if(mod == "observation")
+        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 5))*1
+      # if(mod == "tutor")
+      #   return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 5))*1
       if(mod == "detector")
-        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 10))*1
+        return(x<(FULL_CONTEXT[ROWS]$end - FULL_CONTEXT[ROWS]$start + 5))*1
       else
         return(0)
       },

@@ -593,37 +593,21 @@ join_this <- d_teacher_pos_long %>%
   select(anon_student_id, time_unix, dist, velocity, screenalign) %>% 
   distinct(anon_student_id, time_unix, .keep_all = TRUE)
 
-# If actor or subject is a student, pull it out into a column "anon_student_id" 
-df <- df %>%
-  mutate(anon_student_id = case_when(str_detect(actor, "Stu") ~ actor, str_detect(subject, "Stu") ~ subject)) 
+# When defining the spatial-temporal function, use Conrad's distance-velocity-screenalignment data to use as parameters
+# Don't worry about the student and teacher location columns. This dataset is called "join_this" 
 
-# Join these new features to the dataframe
-df <- left_join(df, join_this, by = c("anon_student_id" = "anon_student_id", "start" = "time_unix"))
+# TODO: Get rid of 26 students without conceptual knowledge and procedural knowledge learning gain data 
+# TODO: Join "join_this" data, prepare it to be used as parameters 
 
-# This is much more complex than I initially thought. Since the data is for intervals, there has to be extensive
-# data organization in order to accurately have facing the screen features, teacher velocity, and student-teacher distance 
-# for each timestamp of question
-
-# The likely step I'll take is to define a function that takes the student-teacher distance, the teacher velocity, and the
-# screen alignment at the start timestamp and the end timestamp, averages them, then imputes that as the distance, 
-# velocity, and screen alignment
-
-# Huge issue: Some teacher and student locations simply do not exist in the metadataset. For these cases, we'll solve for.
-# When defining the spatial-temporal function, we might just use Conrad's distance data and get rid of all the location stuff.
-
-# For now, just process the stuff that can be processed lol 
-df <- df %>%
-  select(-`anon_student_id`) %>%
-  rename(stu_teach_distance = dist) %>%
-  rename(teach_velocity = velocity) %>%
-  relocate(stu_teach_distance, .after = `location`) %>%
-  relocate(teach_velocity, .after = stu_teach_distance) %>%
-  relocate(screenalign, .after = teach_velocity)
+# # If actor or subject is a student, pull it out into a column "anon_student_id" 
+# df <- df %>%
+#   mutate(anon_student_id = case_when(str_detect(actor, "Stu") ~ actor, str_detect(subject, "Stu") ~ subject)) 
+# 
+# # Join these new features to the dataframe
+# df <- left_join(df, join_this, by = c("anon_student_id" = "anon_student_id", "start" = "time_unix"))
 
 # Finally, write dataset 
 write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
-
-
 
 # Unused experimental code for bug fixes and notes
 # 

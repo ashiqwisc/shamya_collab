@@ -613,7 +613,6 @@ write.csv(base_rates, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab
 # This dataset is called "join_this". Don't worry about the student and teacher location columns.
 
 # TODO: Get rid of 26 students without conceptual knowledge and procedural knowledge learning gain data 
-# TODO: Join "join_this" data, prepare it to be used as parameters 
 
 # If actor or subject is a student, pull it out into a column "anon_student_id"
 df <- df %>%

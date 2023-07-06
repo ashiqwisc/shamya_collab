@@ -3,8 +3,8 @@
 df <- read.csv("./datasets/collapsed_AI_classroom_data.csv")
 
 # TODO: Convert screenalignment into binary column
-# Muhammad: This is my first attempt at doing this. Please let me know if this doesn't work well 
 
+# Split screenalignment into binary column. 1 if cosine similarity is >= 0.5, else 0
 df <- df %>%
   mutate(
     screenalignment_binary = ifelse(teacher_screenalignment >= 0.5, 1, 0)

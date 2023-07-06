@@ -593,71 +593,152 @@ join_this <- d_teacher_pos_long %>%
   select(anon_student_id, time_unix, dist, velocity, screenalign) %>% 
   distinct(anon_student_id, time_unix, .keep_all = TRUE)
 
+# Write Dataset 
+write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
+
+# For simplicity, have the write be above, keep organizing below, and rewrite later 
+
+# Make base rate table 
+
+base_rates <- df[, 11:24] 
+base_rates <- as.data.frame(colSums(base_rates)) %>%
+  rename(sums = `colSums(base_rates)`)
+len_df <- nrow(df)
+base_rates$sums <- base_rates$sums / len_df
+
+# Write base rate table
+write.csv(base_rates, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/base_rates_table.csv")
+
 # When defining the spatial-temporal function, use Conrad's distance-velocity-screenalignment data to use as parameters
-# Don't worry about the student and teacher location columns. This dataset is called "join_this" 
+# This dataset is called "join_this". Don't worry about the student and teacher location columns.
 
 # TODO: Get rid of 26 students without conceptual knowledge and procedural knowledge learning gain data 
 # TODO: Join "join_this" data, prepare it to be used as parameters 
 
-# # If actor or subject is a student, pull it out into a column "anon_student_id" 
-# df <- df %>%
-#   mutate(anon_student_id = case_when(str_detect(actor, "Stu") ~ actor, str_detect(subject, "Stu") ~ subject)) 
-# 
-# # Join these new features to the dataframe
-# df <- left_join(df, join_this, by = c("anon_student_id" = "anon_student_id", "start" = "time_unix"))
+# If actor or subject is a student, pull it out into a column "anon_student_id"
+df <- df %>%
+  mutate(anon_student_id = case_when(str_detect(actor, "Stu") ~ actor, str_detect(subject, "Stu") ~ subject))
 
-# Finally, write dataset 
+# Before joining data, split rows in which there are more than one anon_student_id into two rows 
+df <- df %>% 
+  separate_rows(anon_student_id, sep = "; ")
+
+# Join for start_dist
+df <- df %>%
+  left_join(join_this, by = c("start" = "time_unix", "anon_student_id"), suffix = c("_start", "_end")) %>%
+  select(-velocity) %>%
+  rename(start_dist = dist, start_screenalign = screenalign)
+
+# Join for end_dist
+df <- df %>%
+  left_join(join_this, by = c("end" = "time_unix", "anon_student_id"), suffix = c("_start", "_end")) %>%
+  select(-velocity) %>%
+  rename(end_dist = dist, end_screenalign = screenalign)
+# %>%
+  # mutate(student_teacher_distance = (start_dist + end_dist) / 2, teacher_screenalign = (start_screenalign + end_screenalign) / 2) 
+
+# If there is an anon_student_id with NA, find the timestamp of the last time the student appears in join_this, 
+# the timestamp of the next time the student appears in join_this, and average them 
+
+# First, get the rows in which this is NA
+start_dist_na_rows <- which(!is.na(df$anon_student_id) & is.na(df$start_dist))
+end_dist_na_rows <-  which(!is.na(df$anon_student_id) & is.na(df$end_dist))
+
+# Define a function that imputes student_teacher_distance and teacher_screenalign by seraching in join_this for the last and next 
+# occurrence of a specific student id 
+impute_dist_and_screenalign_rows <- function(impute_df, bad_start_rows, bad_end_rows, joiner_df) {
+  for (x in bad_start_rows) {
+    row <- impute_df[x, ]
+    time_start <- row$start
+    student_id <- row$anon_student_id
+    
+    student_df <- joiner_df[joiner_df$anon_student_id == student_id, ]
+    
+    init_time_start <- time_start
+    # Decrement time_start until a matching timestamp is found or goes below the available range
+    while (!(time_start %in% student_df$time_unix) && time_start >= init_time_start - 120) { # Tweak this? 
+      time_start <- time_start - 1
+    }
+    
+    # If time has gone below the available range, check if we can go forwards a bit to get the correct time 
+    while (!(time_start %in% student_df$time_unix) && time_start <= init_time_start + 120) { # Tweak this? 
+      time_start <- time_start + 1
+    } 
+    
+    if (time_start %in% student_df$time_unix) {
+      new_start_dist <- student_df$dist[student_df$time_unix == time_start]
+      new_start_screenalign <- student_df$screenalign[student_df$time_unix == time_start]
+      
+      impute_df[x, "start_dist"] <- new_start_dist
+      impute_df[x, "start_screenalign"] <- new_start_screenalign
+    } else {
+      # Handle the case when no matching timestamp is found within the available range
+      # You can choose an appropriate action here, such as setting the values to NA or a default value
+      impute_df[x, "start_dist"] <- NA
+      impute_df[x, "start_screenalign"] <- NA
+    }
+  }
+  
+  for (y in bad_end_rows) {
+    row <- impute_df[y, ]
+    time_end <- row$end
+    student_id <- row$anon_student_id
+    
+    student_df <- joiner_df[joiner_df$anon_student_id == student_id, ]
+    
+    time_end_init <- time_end
+    # Increment time_end until a matching timestamp is found or goes above the available range
+    while (!(time_end %in% student_df$time_unix) && time_end <= time_end_init + 120) { # Tweak this? 
+      time_end <- time_end + 1
+    } 
+    
+    # If time has gone above the available range, check if we can go backwards a bit to get the correct time 
+    while (!(time_end %in% student_df$time_unix) && time_end >= time_end_init - 120) { # Tweak this? 
+      time_end <- time_end - 1
+    } 
+    
+    if (time_end %in% student_df$time_unix) {
+      new_end_dist <- student_df$dist[student_df$time_unix == time_end]
+      new_end_screenalign <- student_df$screenalign[student_df$time_unix == time_end]
+      
+      impute_df[y, "end_dist"] <- new_end_dist
+      impute_df[y, "end_screenalign"] <- new_end_screenalign
+    } else {
+      # Handle the case when no matching timestamp is found within the available range
+      # You can choose an appropriate action here, such as setting the values to NA or a default value
+      impute_df[y, "end_dist"] <- NA
+      impute_df[y, "end_screenalign"] <- NA
+    }
+  }
+  
+  return(impute_df)
+}
+
+df <- impute_dist_and_screenalign_rows(df, start_dist_na_rows, end_dist_na_rows, join_this) # Call function to impute bad rows in df with entries from join_this
+
+
+# If there is no difference between start and end df, and start or end is NA, take the stuff from end and put it into start and take
+# the stuff from start and put it into end
+df <- df %>%
+  mutate(
+    start_dist = ifelse(end - start == 0 & !is.na(end_dist) & is.na(start_dist), end_dist, start_dist),
+    start_screenalign = ifelse(end - start == 0 & !is.na(end_screenalign) & is.na(start_screenalign), end_screenalign, start_screenalign)
+  )
+
+df <- df %>%
+  mutate(
+    end_dist = ifelse(end - start == 0 & !is.na(start_dist) & is.na(end_dist), start_dist, end_dist),
+    end_screenalign = ifelse(end - start == 0 & !is.na(start_screenalign) & is.na(end_screenalign), start_screenalign, end_screenalign)
+  )
+
+new_missing_starts <-  which(!is.na(df$anon_student_id) & is.na(df$start_dist))
+new_missing_ends <- which(!is.na(df$anon_student_id) & is.na(df$end_dist))
+new_missing_starts
+new_missing_ends
+
+# Even after handling all cases, and checking + or - 2 min in join_this, 
+# there are ~ 250 rows that simply do not have existing distance and/or screenalignment data. Should I just get rid of them? 
+
+# Write Dataset 
 write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)
 
-# Unused experimental code for bug fixes and notes
-# 
-# Output csv for missing data T/F dataframe
-# write.csv(counts_students_df, "./datasets/")
-#
-# Save end timestamps in another dataset, to join later
-# end_of_times <- df["end"]
-# 
-# df <- df %>%
-#   select(-end)
-
-# na_df <- df %>%
-#   filter(is.na(chosen_X) | is.na(chosen_Y)) %>%
-#   select(-c(chosen_X, chosen_Y))
-# 
-# not_na_df <- df %>%
-#   filter(!is.na(chosen_X) & !is.na(chosen_Y))
-
-# relocate(periodID, .before = "time_stamp") %>%
-# relocate(dayID, .before = "periodID")# %>%
-#mutate(time_stamp2 = time_stamp, .after = "time_stamp")
-
-#df_na_locs <- left_join(na_df, df_locations, by = c("dayID", "periodID", "time_stamp" = "start", "time_stamp2" = "end"))
-
-# Code to impute Monitoring class: Fixed location data with last Stopping row's location
-# not_fixed_stopping <- df %>%
-#   arrange(start) %>%
-#   filter(event != "Monitoring class: Fixed" & event != "Stopping")
-# 
-# fixed_stopping <- df %>%
-#   arrange(start) %>%
-#   filter(event == "Monitoring class: Fixed" | event == "Stopping") %>%
-#   mutate()
-# 
-# 
-# fixed <- which(fixed_stopping["event"] == "Monitoring class: Fixed")
-# 
-# for (i in fixed) {
-#   fixed_stopping[i, ]$location <- fixed_stopping[i-1, ]$location
-# }
-# 
-# df <- full_join(not_fixed_stopping, fixed_stopping) %>%
-#   arrange(start)
-
-# df["location"][is.na(df["location"])] <- "None"
-
-#df["subject"][is.na(df["subject"])] <- "None"
-#df["content"][is.na(df["content"])] <- "None"
-# Make all stopping subjects NA so code doesn't break when attempting to collapse "Stopping lines"
-# mutate(subject_stopping = case_when((event == "Stopping") ~ TRUE, (event != "Stopping") ~ FALSE )) %>%
-# mutate(subject = case_when((subject_stopping == TRUE) ~ NA, (subject_stopping == FALSE) ~ subject)) %>%
-# select(-subject_stopping) %>%

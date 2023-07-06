@@ -656,12 +656,12 @@ impute_dist_and_screenalign_rows <- function(impute_df, bad_start_rows, bad_end_
     
     init_time_start <- time_start
     # Decrement time_start until a matching timestamp is found or goes below the available range
-    while (!(time_start %in% student_df$time_unix) && time_start >= init_time_start - 120) { # Tweak this? 
+    while (!(time_start %in% student_df$time_unix) && time_start >= init_time_start - 180) { # Tweak this? 
       time_start <- time_start - 1
     }
     
     # If time has gone below the available range, check if we can go forwards a bit to get the correct time 
-    while (!(time_start %in% student_df$time_unix) && time_start <= init_time_start + 120) { # Tweak this? 
+    while (!(time_start %in% student_df$time_unix) && time_start <= init_time_start + 180) { # Tweak this? 
       time_start <- time_start + 1
     } 
     
@@ -688,12 +688,12 @@ impute_dist_and_screenalign_rows <- function(impute_df, bad_start_rows, bad_end_
     
     time_end_init <- time_end
     # Increment time_end until a matching timestamp is found or goes above the available range
-    while (!(time_end %in% student_df$time_unix) && time_end <= time_end_init + 120) { # Tweak this? 
+    while (!(time_end %in% student_df$time_unix) && time_end <= time_end_init + 180) { # Tweak this? 
       time_end <- time_end + 1
     } 
     
     # If time has gone above the available range, check if we can go backwards a bit to get the correct time 
-    while (!(time_end %in% student_df$time_unix) && time_end >= time_end_init - 120) { # Tweak this? 
+    while (!(time_end %in% student_df$time_unix) && time_end >= time_end_init - 180) { # Tweak this? 
       time_end <- time_end - 1
     } 
     
@@ -733,11 +733,54 @@ df <- df %>%
 
 new_missing_starts <-  which(!is.na(df$anon_student_id) & is.na(df$start_dist))
 new_missing_ends <- which(!is.na(df$anon_student_id) & is.na(df$end_dist))
-new_missing_starts
-new_missing_ends
+# new_missing_starts
+# new_missing_ends
 
 # Even after handling all cases, and checking + or - 2 min in join_this, 
 # there are ~ 250 rows that simply do not have existing distance and/or screenalignment data. Should I just get rid of them? 
+
+# + or - 1 min -- ~ 360
+# + or - 2 min -- ~ 250
+# + or - 3 min -- ~ 190
+# + or - 4 min -- ~ 190 
+# + or - 5 min -- ~ 190
+
+# It looks like after + or - 3 min, we stop improving too much. I would say that we try to impute from start or end, and then remove 
+# all these fellows
+df <- df %>% 
+  mutate(
+    start_dist = ifelse(!is.na(end_dist) & is.na(start_dist), end_dist, start_dist),
+    start_screenalign = ifelse(!is.na(end_screenalign) & is.na(start_screenalign), end_screenalign, start_screenalign)
+  ) %>%
+  mutate(
+    end_dist = ifelse(!is.na(start_dist) & is.na(end_dist), start_dist, end_dist),
+    end_screenalign = ifelse(!is.na(start_screenalign) & is.na(end_screenalign), start_screenalign, end_screenalign)
+  )
+  
+df <- df[!(is.na(df$start_dist) | is.na(df$end_dist)), ]
+
+# Verify that there are none left 
+new_missing_starts <-  which(!is.na(df$anon_student_id) & is.na(df$start_dist))
+new_missing_ends <- which(!is.na(df$anon_student_id) & is.na(df$end_dist))
+if (length(new_missing_starts) != 0) {
+  print(FALSE)
+} else {
+  print(TRUE)
+}
+if (length(new_missing_ends) != 0) {
+  print(FALSE)
+} else {
+  print(TRUE)
+}
+
+# Now that there are no NA entries for start_dist, end_dist, start_screenalign, or end_screenalign, calculate an average accross 
+# the time interval for an event to get the average distance and screenalignment for each student-teacher interaction
+df <- df %>%
+  mutate(
+    student_teacher_distance = (start_dist + end_dist) / 2, 
+    teacher_screenalignment = (start_screenalign + end_screenalign) / 2
+  ) %>%
+  select(-c("anon_student_id", "start_dist", "end_dist", "start_screenalign", "end_screenalign"))
 
 # Write Dataset 
 write.csv(df, "~/Desktop/epistemic_analytics/shamya_collab/shamya_collab/datasets/collapsed_AI_classroom_data.csv", row.names = FALSE)

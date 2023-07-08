@@ -96,7 +96,7 @@ m_tutor <- glmer(outcome_bin ~ kcs*n_opportunity + (1 + n_opportunity | anon_stu
 
 #saveRDS(m_tutor, 'm_tutor.rds')
 
-join_this <- ranef(m_tutor)$anon_student_id %>% 
+join_this2 <- ranef(m_tutor)$anon_student_id %>% 
   rownames_to_column('anon_student_id') %>% 
   janitor::clean_names() %>% 
   rename(learning_rate = n_opportunity) %>% 
@@ -107,6 +107,13 @@ join_this <- ranef(m_tutor)$anon_student_id %>%
   )
 
 df_out_final <- df_out %>% 
-  left_join(join_this, by = c('subject' = 'anon_student_id'))
+  left_join(join_this2, by = c('subject' = 'anon_student_id'))
 
 write_csv(df_out_final, 'final-sample-cb-lak24.csv')
+
+#  Add separate sample for joining
+
+out2 <- join_this %>% 
+  left_join(join_this2, by=c('subject'='anon_student_id'))
+
+write_csv(out2, 'join-sample-cb-lak24.csv')
